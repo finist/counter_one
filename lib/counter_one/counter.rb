@@ -48,7 +48,7 @@ module CounterOne
     end
 
     def recalculate_scope
-      options[:recalculate_scope]
+      options[:recalculate_scope] || ActiveRecord::Relation.new(model)
     end
 
     def relation_chain

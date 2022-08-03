@@ -31,15 +31,22 @@ module CounterOne
         joins_chain = counter_relation_chain.reverse.inject() { |value, key| { key => value } }
         counter_relation_table_name = counter_relation_chain.last.to_s.classify.constantize.table_name
         
-        result = self
-                  .joins(joins_chain)
-                  .then { |scope| counter.recalculate_scope ? scope.merge(counter.recalculate_scope) : scope }
-                  .group("#{counter_relation_table_name}.id")
-                  .count
+        counter_relation_chain.last.to_s.classify.constantize.find_in_batches do |batch|
+          batch_ids = batch.pluck(:id)
 
-        result.each do |key, value|
-          column = counter.options[:column] || "#{self.to_s.tableize}_count"
-          counter.relation_chain.last.to_s.classify.constantize.find(key).update(column => value)
+          result = self
+                    .then { |scope| counter.recalculate_scope.values.include?(:joins) ? scope : scope.joins(joins_chain) }
+                    .merge(counter.recalculate_scope)
+                    .where(counter_relation_table_name => { id: batch_ids })
+                    .group("#{counter_relation_table_name}.id")
+                    .count
+
+          batch_ids.each_with_object(result) { |id, res| res[id] = 0 if !res.include?(id) }
+
+          result.each do |key, value|
+            column = counter.options[:column] || "#{self.to_s.tableize}_count"
+            counter.relation_chain.last.to_s.classify.constantize.find(key).update(column => value)
+          end
         end
       end
 

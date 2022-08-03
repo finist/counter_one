@@ -240,64 +240,74 @@ RSpec.describe CounterOne do
       expect { Product.create(user: user) }.to raise_error(RuntimeError, "Can't find relation user_x for Product")
     end
 
-    it 'should update counters on recalculation' do
-      user = User.create
-      user_2 = User.create
+    context 'on recalculation' do
+      it 'should update counters' do
+        user = User.create
+        user_2 = User.create
 
-      Product.create(user: user)
-      Product.create(user: user)
+        Product.create(user: user)
+        Product.create(user: user)
 
-      Product.create(user: user_2)
+        Product.create(user: user_2)
 
-      Product.counter_one(:user)
+        Product.counter_one(:user)
 
-      expect { Product.counter_one_recalculate }.to change { user.reload.products_count }.from(0).to(2)
+        expect { Product.counter_one_recalculate }.to change { user.reload.products_count }.from(0).to(2)
+      end
+      
+      it 'should update counters to zero if relation has`t items' do
+        user = User.create(products_count: 1)
+
+        Product.counter_one(:user)
+
+        expect { Product.counter_one_recalculate }.to change { user.reload.products_count }.from(1).to(0)
+      end
+      
+      it 'should update multiple counters' do
+        user = User.create
+
+        Product.create(user: user)
+        Product.create(user: user, approved: true)
+
+        Product.counter_one(:user)
+        Product.counter_one(:user, column: :approved_products_count, recalculate_scope: Product.where(approved: true))
+
+        expect { Product.counter_one_recalculate }.to change { 
+          user.reload.slice(:products_count, :approved_products_count).values 
+        }.from([0, 0]).to([2, 1])
+      end
+
+      it 'should update counters with relation param' do
+        user = User.create
+        user_2 = User.create
+
+        Product.create(user: user)
+        Product.create(user: user)
+
+        Product.create(user: user_2)
+
+        Product.counter_one(:user)
+
+        expect { Product.counter_one_recalculate(:user) }.to change { user.reload.products_count }.from(0).to(2)
+      end
+
+      it 'should update counters with :recalculate_scope' do
+        user = User.create
+        user_2 = User.create
+
+        Product.create(user: user)
+        Product.create(user: user, approved: true)
+
+        Product.create(user: user_2)
+
+        Product.counter_one(:user, recalculate_scope: Product.where(approved: true))
+
+        expect { Product.counter_one_recalculate }.to change { user.reload.products_count }.from(0).to(1)
+      end    
     end
-    
-    it 'should update multiple counters on recalculation' do
-      user = User.create
-
-      Product.create(user: user)
-      Product.create(user: user, approved: true)
-
-      Product.counter_one(:user)
-      Product.counter_one(:user, column: :approved_products_count, recalculate_scope: Product.where(approved: true))
-
-      expect { Product.counter_one_recalculate }.to change { 
-        user.reload.slice(:products_count, :approved_products_count).values 
-      }.from([0, 0]).to([2, 1])
-    end
-
-    it 'should update counters with relation param on recalculation' do
-      user = User.create
-      user_2 = User.create
-
-      Product.create(user: user)
-      Product.create(user: user)
-
-      Product.create(user: user_2)
-
-      Product.counter_one(:user)
-
-      expect { Product.counter_one_recalculate(:user) }.to change { user.reload.products_count }.from(0).to(2)
-    end
-
-    it 'should update counters with :recalculate_scope on recalculation' do
-      user = User.create
-      user_2 = User.create
-
-      Product.create(user: user)
-      Product.create(user: user, approved: true)
-
-      Product.create(user: user_2)
-
-      Product.counter_one(:user, recalculate_scope: Product.where(approved: true))
-
-      expect { Product.counter_one_recalculate }.to change { user.reload.products_count }.from(0).to(1)
-    end    
   end
 
-  context 'with chain relation' do
+  context 'with multi level relation' do
     it 'should not change counter without relation' do
       user = User.create
       product = Product.create(user: user)
@@ -467,74 +477,85 @@ RSpec.describe CounterOne do
       expect { Comment.create(product: product) }.to raise_error(RuntimeError, "Can't find relation user_x for Product")
     end
 
-    it 'should update counters on recalculation' do
-      user = User.create
-      user_2 = User.create
+    context 'on recalculation' do
+      it 'should update counters' do
+        user = User.create
+        user_2 = User.create
+        
+        product = Product.create(user: user)
+        product_2 = Product.create(user: user_2)
+
+        Comment.create(product: product)
+        Comment.create(product: product)
+        
+        Comment.create(product: product_2)
+
+        Comment.counter_one([:product, :user])
+
+        expect { Comment.counter_one_recalculate }.to change { user.reload.comments_count }.from(0).to(2)
+      end
+
+      it 'should update counters to zero if relation has`t items' do
+        user = User.create(comments_count: 1)
+        product = Product.create(user: user)
+
+        Comment.counter_one([:product, :user])
+
+        expect { Comment.counter_one_recalculate }.to change { user.reload.comments_count }.from(1).to(0)
+      end
+
+      it 'should update multiple counters' do
+        user = User.create
+        product = Product.create(user: user)
+
+        Comment.create(product: product)
+        Comment.create(product: product, approved: true)
+
+        Comment.counter_one([:product, :user])
+        Comment.counter_one([:product, :user], column: :approved_comments_count, recalculate_scope: Comment.where(approved: true))
+
+        expect { Comment.counter_one_recalculate }.to change { 
+          user.reload.slice(:comments_count, :approved_comments_count).values 
+        }.from([0, 0]).to([2, 1])
+      end
+
+      it 'should update counters with relation param' do
+        user = User.create
+        user_2 = User.create
+
+        product = Product.create(user: user)
+        product_2 = Product.create(user: user_2)
+
+        Comment.create(product: product)
+        Comment.create(product: product)
+
+        Comment.create(product: product_2)
+
+        Comment.counter_one([:product, :user])
+
+        expect { Comment.counter_one_recalculate([:product, :user]) }.to change { user.reload.comments_count }.from(0).to(2)
+      end
       
-      product = Product.create(user: user)
-      product_2 = Product.create(user: user_2)
+      it 'should update counters with :recalculate_scope' do
+        user = User.create
+        user_2 = User.create
 
-      Comment.create(product: product)
-      Comment.create(product: product)
-      
-      Comment.create(product: product_2)
+        product = Product.create(user: user)
+        product_2 = Product.create(user: user_2)
 
-      Comment.counter_one([:product, :user])
+        Comment.create(product: product)
+        Comment.create(product: product, approved: true)
 
-      expect { Comment.counter_one_recalculate }.to change { user.reload.comments_count }.from(0).to(2)
-    end
+        Comment.create(product: product_2)
 
-    it 'should update multiple counters on recalculation' do
-      user = User.create
-      product = Product.create(user: user)
+        Comment.counter_one([:product, :user], recalculate_scope: Comment.where(approved: true))
 
-      Comment.create(product: product)
-      Comment.create(product: product, approved: true)
-
-      Comment.counter_one([:product, :user])
-      Comment.counter_one([:product, :user], column: :approved_comments_count, recalculate_scope: Comment.where(approved: true))
-
-      expect { Comment.counter_one_recalculate }.to change { 
-        user.reload.slice(:comments_count, :approved_comments_count).values 
-      }.from([0, 0]).to([2, 1])
-    end
-
-    it 'should update counters with relation param on recalculation' do
-      user = User.create
-      user_2 = User.create
-
-      product = Product.create(user: user)
-      product_2 = Product.create(user: user_2)
-
-      Comment.create(product: product)
-      Comment.create(product: product)
-
-      Comment.create(product: product_2)
-
-      Comment.counter_one([:product, :user])
-
-      expect { Comment.counter_one_recalculate([:product, :user]) }.to change { user.reload.comments_count }.from(0).to(2)
-    end
-    
-    it 'should update counters with :recalculate_scope on recalculation' do
-      user = User.create
-      user_2 = User.create
-
-      product = Product.create(user: user)
-      product_2 = Product.create(user: user_2)
-
-      Comment.create(product: product)
-      Comment.create(product: product, approved: true)
-
-      Comment.create(product: product_2)
-
-      Comment.counter_one([:product, :user], recalculate_scope: Comment.where(approved: true))
-
-      expect { Comment.counter_one_recalculate([:product, :user]) }.to change { user.reload.comments_count }.from(0).to(1)
+        expect { Comment.counter_one_recalculate([:product, :user]) }.to change { user.reload.comments_count }.from(0).to(1)
+      end
     end
   end
 
-  context 'with complex relation' do
+  context 'with has_one through relation' do
     it 'should not change counter without relation' do
       user = User.create
       product = Product.create(user: user)
@@ -719,71 +740,83 @@ RSpec.describe CounterOne do
       expect { Comment.create(product: product) }.to raise_error(RuntimeError, "Can't find relation user_x for Comment")
     end
 
-    it 'should update counters on recalculation' do
-      user = User.create
-      user_2 = User.create
+    context 'on recalculation' do
+      it 'should update counters' do
+        user = User.create
+        user_2 = User.create
 
-      product = Product.create(user: user)
-      product_2 = Product.create(user: user_2)
+        product = Product.create(user: user)
+        product_2 = Product.create(user: user_2)
 
-      Comment.create(product: product)
-      Comment.create(product: product)
+        Comment.create(product: product)
+        Comment.create(product: product)
 
-      Comment.create(product: product_2)
+        Comment.create(product: product_2)
 
-      Comment.has_one(:user, through: :product)
-      Comment.counter_one(:user)
+        Comment.has_one(:user, through: :product)
+        Comment.counter_one(:user)
 
-      expect { Comment.counter_one_recalculate }.to change { user.reload.comments_count }.from(0).to(2)
+        expect { Comment.counter_one_recalculate }.to change { user.reload.comments_count }.from(0).to(2)
+      end
+
+      it 'should update counters to zero if relation has`t items' do
+        user = User.create(comments_count: 1)
+        product = Product.create(user: user)
+
+        Comment.has_one(:user, through: :product)
+        Comment.counter_one(:user)
+
+        expect { Comment.counter_one_recalculate }.to change { user.reload.comments_count }.from(1).to(0)
+      end
+      
+      it 'should update multiple counters' do
+        user = User.create
+        product = Product.create(user: user)
+
+        Comment.create(product: product)
+        Comment.create(product: product, approved: true)
+
+        Comment.has_one(:user, through: :product)
+        Comment.counter_one(:user)
+        Comment.counter_one(:user, column: :approved_comments_count, recalculate_scope: Comment.where(approved: true))
+
+        expect { Comment.counter_one_recalculate }.to change { 
+          user.reload.slice(:comments_count, :approved_comments_count).values 
+        }.from([0, 0]).to([2, 1])
+      end
+
+      it 'should update counters with relation param' do
+        user = User.create
+        user_2 = User.create
+
+        product = Product.create(user: user)
+        product_2 = Product.create(user: user_2)
+
+        Comment.create(product: product)
+        Comment.create(product: product)
+
+        Comment.create(product: product_2)
+
+        Comment.has_one(:user, through: :product)
+        Comment.counter_one(:user)
+
+        expect { Comment.counter_one_recalculate(:user) }.to change { user.reload.comments_count }.from(0).to(2)
+      end
+
+      it 'should update counters with :recalculate_scope' do
+        user = User.create
+        product = Product.create(user: user)
+
+        Comment.create(product: product)
+        Comment.create(product: product, approved: true)
+
+        Comment.has_one(:user, through: :product)
+        Comment.counter_one(:user)
+        Comment.counter_one(:user, column: :approved_comments_count, recalculate_scope: Comment.where(approved: true))
+
+        expect { Comment.counter_one_recalculate }.to change { user.reload.approved_comments_count }.from(0).to(1)
+      end  
     end
-    
-    it 'should update multiple counters on recalculation' do
-      user = User.create
-      product = Product.create(user: user)
-
-      Comment.create(product: product)
-      Comment.create(product: product, approved: true)
-
-      Comment.has_one(:user, through: :product)
-      Comment.counter_one(:user)
-      Comment.counter_one(:user, column: :approved_comments_count, recalculate_scope: Comment.where(approved: true))
-
-      expect { Comment.counter_one_recalculate }.to change { 
-        user.reload.slice(:comments_count, :approved_comments_count).values 
-      }.from([0, 0]).to([2, 1])
-    end
-
-    it 'should update counters with relation param on recalculation' do
-      user = User.create
-      user_2 = User.create
-
-      product = Product.create(user: user)
-      product_2 = Product.create(user: user_2)
-
-      Comment.create(product: product)
-      Comment.create(product: product)
-
-      Comment.create(product: product_2)
-
-      Comment.has_one(:user, through: :product)
-      Comment.counter_one(:user)
-
-      expect { Comment.counter_one_recalculate(:user) }.to change { user.reload.comments_count }.from(0).to(2)
-    end
-
-    it 'should update counters with :recalculate_scope on recalculation' do
-      user = User.create
-      product = Product.create(user: user)
-
-      Comment.create(product: product)
-      Comment.create(product: product, approved: true)
-
-      Comment.has_one(:user, through: :product)
-      Comment.counter_one(:user)
-      Comment.counter_one(:user, column: :approved_comments_count, recalculate_scope: Comment.where(approved: true))
-
-      expect { Comment.counter_one_recalculate }.to change { user.reload.approved_comments_count }.from(0).to(1)
-    end  
   end
 
   context 'with has_many through relation' do
