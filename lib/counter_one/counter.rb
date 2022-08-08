@@ -60,6 +60,10 @@ module CounterOne
       }.flatten
     end
 
+    def on
+      [options[:on]].flatten.compact
+    end
+
     private
 
     def condition_not_changed?(record, changed_record)

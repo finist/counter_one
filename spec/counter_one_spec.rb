@@ -828,7 +828,7 @@ RSpec.describe CounterOne do
       CategoryUser.create(user: user, category: category)
       CategoryUser.create(user: user, category: category_1)
       
-      User.counter_one(:categories, column: :approved_users_count, only: ->(record) { record.approved? })
+      User.counter_one(:categories, column: :approved_users_count, only: ->(record) { record.approved? }, on: :update)
 
       expect { User.update(approved: true) }.to change { 
         [category.reload.approved_users_count, category_1.reload.approved_users_count]

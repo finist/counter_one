@@ -1,5 +1,7 @@
 # CounterOne
 
+### Work in progress, not ready for production
+
 Improved counter cache for Rails app with support various relationships and conditions.
 
 ## Features

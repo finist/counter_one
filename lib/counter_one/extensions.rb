@@ -11,11 +11,9 @@ module CounterOne
 
         @counter_one_cache << Counter.new(self, relation, options)
 
-        on = [options[:on]].flatten.compact
-
-        after_create  :increment_counters if on.empty? || on.include?(:create)
-        after_destroy :decrement_counters if on.empty? || on.include?(:destroy)
-        after_update  :update_counters if on.empty? || on.include?(:update)
+        after_create  :increment_counters
+        after_destroy :decrement_counters
+        after_update  :update_counters
       end
 
       def counter_one_recalculate(relation = nil)
@@ -56,18 +54,24 @@ module CounterOne
 
     def increment_counters
       self.class.counter_one_cache.each do |counter|
+        next if counter.on.present? && !counter.on.include?(:create)
+
         counter.update_counter(self, :increment!)
       end
     end
 
     def decrement_counters
       self.class.counter_one_cache.each do |counter|
-        counter.update_counter(self, :decrement!)
+        next if counter.on.present? && !counter.on.include?(:destroy)
+
+        counter.update_counter(self, :decrement!) 
       end
     end
 
     def update_counters
       self.class.counter_one_cache.each do |counter|
+        next if counter.on.present? && !counter.on.include?(:update)
+        
         counter.update_counter(record_before_save, :decrement!, self)
         counter.update_counter(self, :increment!, record_before_save)
       end
